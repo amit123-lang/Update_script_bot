@@ -3,93 +3,35 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Save to Device</title>
+<title>Editor</title>
 <style>
-*{box-sizing:border-box}
 body{margin:0;background:#000;color:#fff;font-family:monospace;display:flex;flex-direction:column;height:100vh}
-.top{padding:12px;background:#111;display:flex;justify-content:space-between;align-items:center}
-#info{color:#888;font-size:12px}
-#editor{flex:1;background:#0f0f0f;color:#00ff88;border:1px solid #222;padding:12px;font-size:13px;outline:none;resize:none;width:100%;white-space:pre}
-.bot{padding:12px;background:#111;display:flex;flex-direction:column;gap:8px}
-button{padding:16px;border:0;border-radius:12px;font-weight:800;font-size:15px}
-.b1{background:#2AABEE;color:#fff}
-.b2{background:#fff;color:#000}
-input{background:#222;color:#fff;border:1px solid #333;padding:10px;border-radius:8px;width:100%}
-#status{text-align:center;font-size:11px;color:#555}
+#ed{flex:1;background:#111;color:#0f0;border:0;padding:12px;font-size:13px;outline:none;white-space:pre}
+button{padding:18px;background:#2AABEE;color:#fff;border:0;font-weight:800;font-size:16px}
+#top{padding:10px;background:#111;display:flex;justify-content:space-between}
 </style>
 </head>
 <body>
-<div class="top"><b>📁 SAVE TO DEVICE</b><span id="info">0 chars</span></div>
-
-<input id="fname" value="bot.py" placeholder="File name">
-
-<textarea id="editor" spellcheck="false" placeholder="Paste your bot code here or load via?url="></textarea>
-
-<div class="bot">
-<button class="b1" onclick="saveToDevice()">💾 SAVE TO DOWNLOAD FOLDER</button>
-<button class="b2" onclick="saveToGoogleDrive()">☁️ Open in Google Drive (Share)</button>
-<div id="status">Ready - File will go to /storage/Download/</div>
-</div>
+<div id="top"><b>EDITOR</b><span id="c">0</span></div>
+<textarea id="ed" placeholder="Paste code here..."></textarea>
+<button onclick="save()">💾 SAVE AS 1.py TO PHONE</button>
 
 <script>
-let ed = document.getElementById('editor');
-let info = document.getElementById('info');
-let status = document.getElementById('status');
-let fname = document.getElementById('fname');
-
-ed.addEventListener('input', ()=>{
-  info.textContent = ed.value.length + ' chars | ' + ed.value.split('\n').length + ' lines';
-});
-
-// Auto load if?url= present
+let ed=document.getElementById('ed'), c=document.getElementById('c');
+ed.addEventListener('input',()=>c.textContent=ed.value.length+' chars');
 (async()=>{
-  let u = new URLSearchParams(location.search).get('url');
-  if(!u) return;
-  status.textContent = 'Loading from URL...';
-  try{
-    let t = await (await fetch(u)).text();
-    ed.value = t;
-    info.textContent = t.length + ' chars';
-    status.textContent = 'Loaded ✅ Now edit and SAVE';
-  }catch(e){ status.textContent = 'Manual paste needed'; }
+ let u=new URLSearchParams(location.search).get('url');
+ if(u){ ed.value=await (await fetch(u)).text(); c.textContent=ed.value.length+' chars'; }
 })();
 
-function saveToDevice(){
-  let code = ed.value;
-  if(!code){ alert('Code empty!'); return; }
-  let name = fname.value || 'bot.py';
-  if(!name.endsWith('.py')) name += '.py';
-
-  // This directly downloads to mobile storage
-  let blob = new Blob([code], {type: 'text/x-python;charset=utf-8'});
-  let url = URL.createObjectURL(blob);
-  let a = document.createElement('a');
-  a.href = url;
-  a.download = name; // This forces save to Download folder
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-
-  status.textContent = '✅ Saved to: Download/' + name + ' (' + Math.round(code.length/1024) + 'KB)';
-  status.style.color = '#00ff88';
-
-  // Vibration feedback on mobile
-  if(navigator.vibrate) navigator.vibrate(100);
-}
-
-function saveToGoogleDrive(){
-  let code = ed.value;
-  let name = fname.value || 'bot.py';
-  // Share via Google Drive / Gmail / Any app
-  let blob = new Blob([code], {type: 'text/plain'});
-  let file = new File([blob], name, {type: 'text/plain'});
-  if(navigator.share && navigator.canShare({files:[file]})){
-    navigator.share({files:[file], title:name, text:'Bot script'});
-  }else{
-    saveToDevice();
-    alert('Share not supported, downloaded to Download folder. Upload that file to Google Drive manually.');
-  }
+function save(){
+ let code=ed.value;
+ if(!code){ alert('empty'); return; }
+ let blob=new Blob([code], {type:'text/x-python'});
+ let a=document.createElement('a');
+ a.href=URL.createObjectURL(blob);
+ a.download='1.py'; // <-- FIXED as 1.py
+ a.click();
 }
 </script>
 </body>
