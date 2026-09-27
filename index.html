@@ -1,111 +1,101 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bot Script Editor</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <style>
-        body {
-            background-color: var(--tg-theme-bg-color, #1e1e1e);
-            color: var(--tg-theme-text-color, #ffffff);
-            font-family: monospace;
-            margin: 0;
-            padding: 10px;
-            display: flex;
-            flex-direction: column;
-            height: 95vh;
-        }
-        #status {
-            text-align: center;
-            font-family: sans-serif;
-            color: #aaa;
-            margin-bottom: 10px;
-        }
-        textarea {
-            flex-grow: 1;
-            background-color: #2d2d2d;
-            color: #00ff00;
-            border: 1px solid #444;
-            padding: 10px;
-            font-size: 14px;
-            resize: none;
-            border-radius: 8px;
-            outline: none;
-            white-space: pre;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bot Editor - Mini App</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+body { background:#0f0f0f; color:#fff; font-family: monospace; margin:0; padding:15px; }
+h2 { color:#2AABEE; }
+#editor { width:100%; height:65vh; background:#1a1a1a; color:#00ff88; border:1px solid #333; border-radius:8px; padding:10px; font-size:13px; }
+.row { display:flex; gap:10px; margin:10px 0; }
+input { flex:1; background:#1a1a1a; border:1px solid #333; color:#fff; padding:10px; border-radius:6px; }
+button { background:#2AABEE; color:#fff; border:none; padding:12px 20px; border-radius:8px; font-weight:bold; width:100%; margin-top:10px; cursor:pointer; }
+button.secondary { background:#333; }
+#status { margin-top:10px; color:#aaa; font-size:12px; }
+</style>
 </head>
 <body>
-    <div id="status">🛠️ Ultimate Bot Editor <br><small>Loading script from Termux...</small></div>
+<h2>📝 Live Script Editor</h2>
+<div class="row">
+<input id="gistUrl" placeholder="Paste current script RAW URL (github raw / gist raw)" />
+<button onclick="loadCode()" style="width:100px">Load</button>
+</div>
+
+<textarea id="editor" placeholder="// Your bot script will appear here..."></textarea>
+
+<div id="status">Ready</div>
+
+<button onclick="updateBot()">🚀 Update Bot via Mini App</button>
+<button class="secondary" onclick="saveToGithub()">💾 Save to GitHub Gist</button>
+
+<script>
+const tg = window.Telegram.WebApp;
+tg.expand();
+
+async function loadCode(){
+  const url = document.getElementById('gistUrl').value.trim();
+  if(!url) return alert("Enter RAW URL");
+  document.getElementById('status').innerText = "Loading...";
+  try{
+    const r = await fetch(url);
+    const text = await r.text();
+    document.getElementById('editor').value = text;
+    document.getElementById('status').innerText = "Loaded: " + text.length + " chars";
+  }catch(e){
+    document.getElementById('status').innerText = "Load failed: " + e;
+  }
+}
+
+function updateBot(){
+  const code = document.getElementById('editor').value;
+  if(code.length < 10) return alert("Editor empty");
+  
+  // Create a temporary raw paste using a free service - we will send direct code
+  // Since your handler supports direct code + UPDATE_URL, we use direct sendData
+  const status = document.getElementById('status');
+  status.innerText = "Sending to bot...";
+  
+  // Option 1: If code is small < 4000 chars, send direct
+  if(code.length < 3500){
+    tg.sendData(code);
+  } else {
+    // Option 2: For large code, you need to host raw first then send UPDATE_URL|link
+    // This uses gist to host automatically if you set GITHUB TOKEN
+    alert("Code too large for direct send. First click Save to GitHub Gist, then it will auto send UPDATE_URL");
+    saveToGithub(true);
+  }
+}
+
+async function saveToGithub(autoSend = false){
+  const token = prompt("Enter GitHub Personal Access Token (ghp_...) - needed only once to create raw link:");
+  if(!token) return;
+  const code = document.getElementById('editor').value;
+  document.getElementById('status').innerText = "Uploading to Gist...";
+  
+  try{
+    const res = await fetch("https://api.github.com/gists", {
+      method:"POST",
+      headers:{ "Authorization":"token "+token, "Content-Type":"application/json" },
+      body: JSON.stringify({
+        public:false,
+        files:{ "bot_script.py": { content: code } }
+      })
+    });
+    const data = await res.json();
+    const rawUrl = data.files["bot_script.py"].raw_url;
+    document.getElementById('gistUrl').value = rawUrl;
+    document.getElementById('status').innerText = "Saved! Raw: " + rawUrl;
     
-    <textarea id="codeEditor" placeholder="Your Python script will appear here..."></textarea>
-
-    <script>
-        let tg = window.Telegram.WebApp;
-        tg.expand();
-
-        tg.MainButton.text = "UPDATE BOT SCRIPT";
-        tg.MainButton.color = "#28a745";
-        tg.MainButton.show();
-
-        // 1. Fetch the script sent by the bot
-        const urlParams = new URLSearchParams(window.location.search);
-        const scriptUrl = urlParams.get('url');
-
-        if (scriptUrl) {
-            const proxyUrl = "https://api.allorigins.win/raw?url=" + encodeURIComponent(scriptUrl);
-            fetch(proxyUrl)
-                .then(response => response.text())
-                .then(data => {
-                    document.getElementById("codeEditor").value = data;
-                    document.getElementById("status").innerHTML = "🛠️ Ultimate Bot Editor <br><small style='color:#0f0'>✅ Script Loaded Successfully!</small>";
-                })
-                .catch(err => {
-                    document.getElementById("status").innerHTML = "🛠️ Ultimate Bot Editor <br><small style='color:red'>❌ Failed to load script.</small>";
-                });
-        }
-
-        // 2. Upload the new code securely with a CORS proxy bypass
-        tg.MainButton.onClick(function() {
-            let newCode = document.getElementById("codeEditor").value;
-            if(newCode.trim() === "") {
-                tg.showAlert("⚠️ Cannot upload an empty script!");
-                return;
-            }
-
-            tg.MainButton.showProgress();
-
-            // Encode the data so the API accepts it cleanly
-            let urlEncodedData = new URLSearchParams();
-            urlEncodedData.append('expiry_days', '1');
-            urlEncodedData.append('content', newCode);
-
-            // Fetch request routed through corsproxy.io to bypass Android WebView blocks
-            fetch('https://corsproxy.io/?https://dpaste.com/api/v2/', {
-                method: 'POST',
-                body: urlEncodedData,
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                }
-            })
-            .then(response => {
-                if(!response.ok) throw new Error("Upload Failed");
-                return response.text();
-            })
-            .then(url => {
-                let cleanUrl = url.trim();
-                if (!cleanUrl.startsWith("http")) throw new Error("Invalid URL returned");
-                
-                let textUrl = cleanUrl + ".txt";
-                // Only send the tiny link back to Telegram, preventing the 4000-character crash
-                tg.sendData("UPDATE_URL|" + textUrl); 
-            })
-            .catch(err => {
-                tg.MainButton.hideProgress();
-                tg.showAlert("❌ Upload Blocked: Network security rejected the connection. Try again.");
-            });
-        });
-    </script>
+    if(autoSend || confirm("Gist created. Send UPDATE_URL to bot now?")){
+      const payload = "UPDATE_URL|" + rawUrl;
+      tg.sendData(payload);
+    }
+  }catch(e){
+    document.getElementById('status').innerText = "GitHub save failed: " + e;
+  }
+}
+</script>
 </body>
 </html>
