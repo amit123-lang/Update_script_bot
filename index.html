@@ -49,6 +49,7 @@
         tg.MainButton.color = "#28a745";
         tg.MainButton.show();
 
+        // 1. Fetch the script sent by the bot
         const urlParams = new URLSearchParams(window.location.search);
         const scriptUrl = urlParams.get('url');
 
@@ -65,6 +66,7 @@
                 });
         }
 
+        // 2. Upload the new code securely with a CORS proxy bypass
         tg.MainButton.onClick(function() {
             let newCode = document.getElementById("codeEditor").value;
             if(newCode.trim() === "") {
@@ -74,22 +76,34 @@
 
             tg.MainButton.showProgress();
 
-            let formData = new FormData();
-            formData.append('expiry_days', '1');
-            formData.append('content', newCode);
+            // Encode the data so the API accepts it cleanly
+            let urlEncodedData = new URLSearchParams();
+            urlEncodedData.append('expiry_days', '1');
+            urlEncodedData.append('content', newCode);
 
-            fetch('https://dpaste.com/api/v2/', {
+            // Fetch request routed through corsproxy.io to bypass Android WebView blocks
+            fetch('https://corsproxy.io/?https://dpaste.com/api/v2/', {
                 method: 'POST',
-                body: formData
+                body: urlEncodedData,
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
             })
-            .then(response => response.text())
+            .then(response => {
+                if(!response.ok) throw new Error("Upload Failed");
+                return response.text();
+            })
             .then(url => {
-                let textUrl = url.trim() + ".txt";
+                let cleanUrl = url.trim();
+                if (!cleanUrl.startsWith("http")) throw new Error("Invalid URL returned");
+                
+                let textUrl = cleanUrl + ".txt";
+                // Only send the tiny link back to Telegram, preventing the 4000-character crash
                 tg.sendData("UPDATE_URL|" + textUrl); 
             })
             .catch(err => {
-                tg.showAlert("❌ Upload failed. Check your internet.");
                 tg.MainButton.hideProgress();
+                tg.showAlert("❌ Upload Blocked: Network security rejected the connection. Try again.");
             });
         });
     </script>
