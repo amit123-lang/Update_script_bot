@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bot Script Editor</title>
+    <!-- Import Telegram's official Web App script -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            background-color: var(--tg-theme-bg-color, #1e1e1e);
+            color: var(--tg-theme-text-color, #ffffff);
+            font-family: monospace;
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            height: 95vh;
+        }
+        textarea {
+            flex-grow: 1;
+            background-color: #2d2d2d;
+            color: #00ff00;
+            border: 1px solid #444;
+            padding: 10px;
+            font-size: 14px;
+            resize: none;
+            border-radius: 8px;
+            outline: none;
+        }
+    </style>
+</head>
+<body>
+
+    <h3 style="text-align: center; font-family: sans-serif;">🛠️ Ultimate Bot Editor</h3>
+    <textarea id="codeEditor" placeholder="Paste your updated Python script here..."></textarea>
+
+    <script>
+        let tg = window.Telegram.WebApp;
+        tg.expand(); // Make the Mini App fill the screen
+
+        // Set up the Telegram Main Button at the bottom of the screen
+        tg.MainButton.text = "UPDATE BOT SCRIPT";
+        tg.MainButton.color = "#28a745"; // Green color
+        tg.MainButton.show();
+
+        // When the Admin clicks the Update button
+        Telegram.WebApp.onEvent('mainButtonClicked', function() {
+            let newCode = document.getElementById("codeEditor").value;
+            
+            if(newCode.trim() === "") {
+                tg.showAlert("⚠️ Cannot upload an empty script!");
+                return;
+            }
+
+            // Send the code invisibly back to the Python script in Termux
+            tg.sendData(newCode);
+        });
+    </script>
+</body>
+  </html>
+  
