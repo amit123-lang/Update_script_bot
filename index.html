@@ -3,77 +3,92 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bot Editor</title>
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<title>Save to Device</title>
 <style>
 *{box-sizing:border-box}
-body{margin:0;background:#0a0a0a;color:#fff;font-family:monospace;display:flex;flex-direction:column;height:100vh}
-.header{padding:12px;background:#151515;border-bottom:1px solid #222;display:flex;justify-content:space-between}
-#len{color:#888;font-size:12px}
-#editor{flex:1;background:#111;color:#00ff88;border:none;padding:12px;font-size:13px;outline:none;resize:none}
-.footer{padding:10px;background:#151515;display:flex;gap:8px;flex-direction:column}
-.btn{padding:14px;border:0;border-radius:10px;font-weight:700;color:#fff}
-.btn-blue{background:#2AABEE}
-.btn-green{background:#00c853}
-#status{font-size:11px;color:#666;text-align:center}
+body{margin:0;background:#000;color:#fff;font-family:monospace;display:flex;flex-direction:column;height:100vh}
+.top{padding:12px;background:#111;display:flex;justify-content:space-between;align-items:center}
+#info{color:#888;font-size:12px}
+#editor{flex:1;background:#0f0f0f;color:#00ff88;border:1px solid #222;padding:12px;font-size:13px;outline:none;resize:none;width:100%;white-space:pre}
+.bot{padding:12px;background:#111;display:flex;flex-direction:column;gap:8px}
+button{padding:16px;border:0;border-radius:12px;font-weight:800;font-size:15px}
+.b1{background:#2AABEE;color:#fff}
+.b2{background:#fff;color:#000}
+input{background:#222;color:#fff;border:1px solid #333;padding:10px;border-radius:8px;width:100%}
+#status{text-align:center;font-size:11px;color:#555}
 </style>
 </head>
 <body>
-<div class="header"><b>💻 BOT EDITOR</b><span id="len">0 chars</span></div>
-<textarea id="editor" spellcheck="false" placeholder="Loading..."></textarea>
-<div class="footer">
-<button class="btn btn-blue" onclick="downloadPy()">⬇️ Download Edited.py</button>
-<button class="btn btn-green" onclick="uploadToBot()">🚀 Upload to Bot (/update_bot)</button>
-<div id="status">Ready</div>
+<div class="top"><b>📁 SAVE TO DEVICE</b><span id="info">0 chars</span></div>
+
+<input id="fname" value="bot.py" placeholder="File name">
+
+<textarea id="editor" spellcheck="false" placeholder="Paste your bot code here or load via?url="></textarea>
+
+<div class="bot">
+<button class="b1" onclick="saveToDevice()">💾 SAVE TO DOWNLOAD FOLDER</button>
+<button class="b2" onclick="saveToGoogleDrive()">☁️ Open in Google Drive (Share)</button>
+<div id="status">Ready - File will go to /storage/Download/</div>
 </div>
 
 <script>
-let tg = Telegram.WebApp; tg.expand();
 let ed = document.getElementById('editor');
-let len = document.getElementById('len');
+let info = document.getElementById('info');
 let status = document.getElementById('status');
+let fname = document.getElementById('fname');
 
-ed.addEventListener('input', ()=> len.textContent = ed.value.length + ' chars | ' + ed.value.split('\n').length + ' lines');
+ed.addEventListener('input', ()=>{
+  info.textContent = ed.value.length + ' chars | ' + ed.value.split('\n').length + ' lines';
+});
 
-// Load from?url=
+// Auto load if?url= present
 (async()=>{
   let u = new URLSearchParams(location.search).get('url');
-  if(!u){ ed.placeholder='Paste your py code here...'; status.textContent='Paste code manually'; return; }
-  status.textContent='Loading...';
+  if(!u) return;
+  status.textContent = 'Loading from URL...';
   try{
-    let code = await (await fetch(u)).text();
-    ed.value = code;
-    len.textContent = code.length + ' chars';
-    status.textContent='Loaded ✅';
-  }catch(e){ status.textContent='Load failed: '+e; }
+    let t = await (await fetch(u)).text();
+    ed.value = t;
+    info.textContent = t.length + ' chars';
+    status.textContent = 'Loaded ✅ Now edit and SAVE';
+  }catch(e){ status.textContent = 'Manual paste needed'; }
 })();
 
-// Create and download edited py file locally
-function downloadPy(){
+function saveToDevice(){
   let code = ed.value;
-  let blob = new Blob([code], {type:'text/x-python'});
+  if(!code){ alert('Code empty!'); return; }
+  let name = fname.value || 'bot.py';
+  if(!name.endsWith('.py')) name += '.py';
+
+  // This directly downloads to mobile storage
+  let blob = new Blob([code], {type: 'text/x-python;charset=utf-8'});
+  let url = URL.createObjectURL(blob);
   let a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'bot_edited.py';
+  a.href = url;
+  a.download = name; // This forces save to Download folder
+  document.body.appendChild(a);
   a.click();
-  status.textContent='Downloaded bot_edited.py ✅ Now send to bot with /update_bot';
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  status.textContent = '✅ Saved to: Download/' + name + ' (' + Math.round(code.length/1024) + 'KB)';
+  status.style.color = '#00ff88';
+
+  // Vibration feedback on mobile
+  if(navigator.vibrate) navigator.vibrate(100);
 }
 
-// Upload directly to bot (no external server)
-function uploadToBot(){
+function saveToGoogleDrive(){
   let code = ed.value;
-  if(code.length < 20){ alert('Code empty!'); return; }
-  status.textContent = 'Uploading to bot... ' + code.length + ' chars';
-
-  if(code.length <= 3900){
-    // Direct - fastest
-    tg.sendData(code);
+  let name = fname.value || 'bot.py';
+  // Share via Google Drive / Gmail / Any app
+  let blob = new Blob([code], {type: 'text/plain'});
+  let file = new File([blob], name, {type: 'text/plain'});
+  if(navigator.share && navigator.canShare({files:[file]})){
+    navigator.share({files:[file], title:name, text:'Bot script'});
   }else{
-    // Big file - split safe upload using Telegram CloudStorage
-    status.textContent='Big file, splitting...';
-    // We will send as file via download trick + instruct user
-    downloadPy();
-    tg.sendData('NEED_FILE|'+code.length);
+    saveToDevice();
+    alert('Share not supported, downloaded to Download folder. Upload that file to Google Drive manually.');
   }
 }
 </script>
