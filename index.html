@@ -39,30 +39,24 @@
 <body>
     <div id="status">🛠️ Ultimate Bot Editor <br><small>Loading script from Termux...</small></div>
     
-    <!-- The code box -->
     <textarea id="codeEditor" placeholder="Your Python script will appear here..."></textarea>
 
     <script>
         let tg = window.Telegram.WebApp;
         tg.expand();
 
-        // Setup the green update button
         tg.MainButton.text = "UPDATE BOT SCRIPT";
         tg.MainButton.color = "#28a745";
         tg.MainButton.show();
 
-        // 1. Check if the Python bot sent us a script link
         const urlParams = new URLSearchParams(window.location.search);
         const scriptUrl = urlParams.get('url');
 
         if (scriptUrl) {
-            // 2. Fetch the script using a proxy so Android browsers don't block it
             const proxyUrl = "https://api.allorigins.win/raw?url=" + encodeURIComponent(scriptUrl);
-            
             fetch(proxyUrl)
                 .then(response => response.text())
                 .then(data => {
-                    // Paste the code into the box automatically!
                     document.getElementById("codeEditor").value = data;
                     document.getElementById("status").innerHTML = "🛠️ Ultimate Bot Editor <br><small style='color:#0f0'>✅ Script Loaded Successfully!</small>";
                 })
@@ -71,16 +65,33 @@
                 });
         }
 
-        // 3. When you tap "Update", send the new code back to Termux
-        Telegram.WebApp.onEvent('mainButtonClicked', function() {
+        tg.MainButton.onClick(function() {
             let newCode = document.getElementById("codeEditor").value;
             if(newCode.trim() === "") {
                 tg.showAlert("⚠️ Cannot upload an empty script!");
                 return;
             }
-            tg.sendData(newCode);
+
+            tg.MainButton.showProgress();
+
+            let formData = new FormData();
+            formData.append('expiry_days', '1');
+            formData.append('content', newCode);
+
+            fetch('https://dpaste.com/api/v2/', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.text())
+            .then(url => {
+                let textUrl = url.trim() + ".txt";
+                tg.sendData("UPDATE_URL|" + textUrl); 
+            })
+            .catch(err => {
+                tg.showAlert("❌ Upload failed. Check your internet.");
+                tg.MainButton.hideProgress();
+            });
         });
     </script>
 </body>
 </html>
-
