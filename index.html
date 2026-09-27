@@ -1,88 +1,42 @@
 <!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<html><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Live Editor</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<style>
-:root{--bg:#0a0a0a;--card:#161616;--border:#262626;--accent:#2AABEE;--green:#00ff88}
-body{background:var(--bg);color:#fff;font-family:Consolas,monospace;margin:0;padding:0;display:flex;flex-direction:column;height:100vh}
-.header{padding:14px 15px;background:var(--card);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
-.header b{color:var(--accent);font-size:14px}
-#stats{font-size:11px;color:#888}
-#editor{flex:1;width:100%;background:var(--card);color:var(--green);border:none;padding:15px;font-size:13px;line-height:1.6;outline:none;resize:none;box-sizing:border-box}
-.footer{padding:12px;background:var(--card);border-top:1px solid var(--border)}
-.btn{background:var(--accent);color:#fff;border:none;padding:14px;border-radius:10px;font-weight:700;width:100%;cursor:pointer;font-size:15px}
-#status{font-size:11px;color:#666;margin-top:8px;text-align:center}
-</style>
-</head>
-<body>
-<div class="header">
-<b>💻 LIVE EDITOR</b>
-<span id="stats">loading...</span>
-</div>
-<textarea id="editor" placeholder="Loading script..."></textarea>
-<div class="footer">
-<button class="btn" id="btn" onclick="pushUpdate()">🚀 UPDATE & RESTART BOT</button>
-<div id="status">Connecting...</div>
-</div>
-
+<style>body{background:#0a0a0a;color:#fff;font-family:monospace;margin:0;display:flex;flex-direction:column;height:100vh} #editor{flex:1;background:#161616;color:#00ff88;border:none;padding:12px;font-size:13px;outline:none;white-space:pre}.f{padding:12px;background:#161616} button{background:#2AABEE;color:#fff;border:none;padding:14px;border-radius:10px;width:100%;font-weight:700} #st{font-size:11px;color:#666;text-align:center;margin-top:6px}</style>
+</head><body>
+<div style="padding:10px;background:#161616">💻 LIVE EDITOR <span id="s" style="float:right;color:#888;font-size:11px"></span></div>
+<textarea id="editor" spellcheck="false"></textarea>
+<div class="f"><button id="b" onclick="go()">🚀 UPDATE BOT</button><div id="st">Ready</div></div>
 <script>
-const tg = window.Telegram.WebApp;
-tg.expand();
-const editor = document.getElementById('editor');
-const stats = document.getElementById('stats');
-const status = document.getElementById('status');
-const btn = document.getElementById('btn');
-
-editor.addEventListener('input', () => {
-  stats.innerText = editor.value.length + " chars | " + editor.value.split("\n").length + " lines";
-});
-
-async function autoLoad(){
-  const params = new URLSearchParams(window.location.search);
-  const fileUrl = params.get('url');
-  if(!fileUrl){
-    status.innerText = "No url found. Open via /editor command";
-    editor.placeholder = "// Paste code here...";
-    return;
-  }
-  status.innerText = "Downloading...";
-  try{
-    const res = await fetch(fileUrl);
-    const code = await res.text();
-    editor.value = code;
-    stats.innerText = code.length + " chars | " + code.split("\n").length + " lines";
-    status.innerText = "Loaded ✅ Ready";
-  }catch(e){
-    status.innerText = "Load failed: " + e;
-  }
-}
-autoLoad();
-
-function pushUpdate(){
-  const code = editor.value;
-  if(code.length < 20) return alert("Code empty!");
-  btn.disabled = true;
-
-  if(code.length > 3900){
-    status.innerText = "Code big ("+code.length+"), fast uploading to paste.rs...";
-    fetch("https://paste.rs", { method:"POST", body: code })
-   .then(r => r.text())
-   .then(link => {
-      status.innerText = "Uploaded! Sending to bot...";
-      tg.sendData("UPDATE_URL|" + link.trim());
-    })
-   .catch(e => {
-      status.innerText = "Upload failed: " + e;
-      btn.disabled = false;
-    });
+const tg=Telegram.WebApp; tg.expand();
+const ed=document.getElementById('editor'), st=document.getElementById('st'), s=document.getElementById('s'), b=document.getElementById('b');
+ed.addEventListener('input',()=>s.innerText=ed.value.length+' chars');
+(async()=>{
+  const u=new URLSearchParams(location.search).get('url');
+  if(!u) return;
+  st.innerText='Loading...';
+  ed.value=await (await fetch(u)).text();
+  s.innerText=ed.value.length+' chars'; st.innerText='Ready ✅';
+})();
+async function go(){
+  let code=ed.value;
+  if(code.length<20) return alert('empty');
+  b.disabled=true;
+  if(code.length>3500){
+    st.innerText='Uploading '+Math.round(code.length/1024)+'KB to fast server...';
+    try{
+      // 0x0.st is raw bytes - NO compression, NO change to data
+      let fd=new FormData();
+      fd.append('file', new Blob([code], {type:'text/x-python'}), 'bot.py');
+      let r=await fetch('https://0x0.st', {method:'POST', body: fd});
+      let link=(await r.text()).trim();
+      st.innerText='Got link, sending to bot...';
+      tg.sendData('UPDATE_URL|'+link);
+    }catch(e){ st.innerText='Upload failed: '+e; b.disabled=false; }
   } else {
-    status.innerText = "Sending directly to bot...";
+    st.innerText='Sending directly...';
     tg.sendData(code);
   }
 }
-</script>
-</body>
-</html>
+</script></body></html>
