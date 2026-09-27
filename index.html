@@ -3,84 +3,78 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Editor</title>
+<title>Bot Editor</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 *{box-sizing:border-box}
-body{margin:0;background:#0e0e0e;color:#fff;font-family:monospace;display:flex;flex-direction:column;height:100vh}
-.top{padding:12px 14px;background:#171717;border-bottom:1px solid #222;display:flex;justify-content:space-between}
-#info{color:#888;font-size:12px}
-#code{flex:1;background:#111;color:#9eff9e;border:0;padding:12px;font-size:13px;outline:none;resize:none;width:100%}
-.bottom{padding:10px;background:#171717;border-top:1px solid #222}
-button{width:100%;padding:14px;background:#2AABEE;color:#fff;border:0;border-radius:10px;font-weight:bold;font-size:15px}
-#msg{font-size:11px;color:#666;text-align:center;margin-top:6px}
+body{margin:0;background:#0a0a0a;color:#fff;font-family:monospace;display:flex;flex-direction:column;height:100vh}
+.header{padding:12px;background:#151515;border-bottom:1px solid #222;display:flex;justify-content:space-between}
+#len{color:#888;font-size:12px}
+#editor{flex:1;background:#111;color:#00ff88;border:none;padding:12px;font-size:13px;outline:none;resize:none}
+.footer{padding:10px;background:#151515;display:flex;gap:8px;flex-direction:column}
+.btn{padding:14px;border:0;border-radius:10px;font-weight:700;color:#fff}
+.btn-blue{background:#2AABEE}
+.btn-green{background:#00c853}
+#status{font-size:11px;color:#666;text-align:center}
 </style>
 </head>
 <body>
-<div class="top"><b>💻 EDITOR</b><span id="info">loading...</span></div>
-<textarea id="code" placeholder="Waiting for script..."></textarea>
-<div class="bottom">
-<button onclick="save()">🚀 SAVE & RESTART</button>
-<div id="msg">Ready</div>
+<div class="header"><b>💻 BOT EDITOR</b><span id="len">0 chars</span></div>
+<textarea id="editor" spellcheck="false" placeholder="Loading..."></textarea>
+<div class="footer">
+<button class="btn btn-blue" onclick="downloadPy()">⬇️ Download Edited.py</button>
+<button class="btn btn-green" onclick="uploadToBot()">🚀 Upload to Bot (/update_bot)</button>
+<div id="status">Ready</div>
 </div>
 
 <script>
-let tg = Telegram.WebApp;
-tg.expand();
-let el = document.getElementById('code');
-let info = document.getElementById('info');
-let msg = document.getElementById('msg');
+let tg = Telegram.WebApp; tg.expand();
+let ed = document.getElementById('editor');
+let len = document.getElementById('len');
+let status = document.getElementById('status');
 
-el.addEventListener('input', ()=> info.textContent = el.value.length + ' chars');
+ed.addEventListener('input', ()=> len.textContent = ed.value.length + ' chars | ' + ed.value.split('\n').length + ' lines');
 
-// 1. AUTO LOAD from?url=
+// Load from?url=
 (async()=>{
-  let url = new URLSearchParams(location.search).get('url');
-  if(!url){ msg.textContent='Open via /editor command'; info.textContent='0 chars'; return; }
-  msg.textContent='Loading...';
+  let u = new URLSearchParams(location.search).get('url');
+  if(!u){ ed.placeholder='Paste your py code here...'; status.textContent='Paste code manually'; return; }
+  status.textContent='Loading...';
   try{
-    let r = await fetch(url);
-    let t = await r.text();
-    el.value = t;
-    info.textContent = t.length + ' chars | ' + t.split('\n').length + ' lines';
-    msg.textContent = 'Loaded ✅';
-  }catch(e){ msg.textContent='Load error: '+e; }
+    let code = await (await fetch(u)).text();
+    ed.value = code;
+    len.textContent = code.length + ' chars';
+    status.textContent='Loaded ✅';
+  }catch(e){ status.textContent='Load failed: '+e; }
 })();
 
-// 2. SAVE - Direct send, no external server
-function save(){
-  let data = el.value;
-  if(data.length < 10){ alert('Code empty'); return; }
-  msg.textContent = 'Sending to bot...';
+// Create and download edited py file locally
+function downloadPy(){
+  let code = ed.value;
+  let blob = new Blob([code], {type:'text/x-python'});
+  let a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'bot_edited.py';
+  a.click();
+  status.textContent='Downloaded bot_edited.py ✅ Now send to bot with /update_bot';
+}
 
-  // If code < 4096, send directly (fastest, no fail)
-  if(data.length <= 3900){
-    tg.sendData(data);
-    return;
+// Upload directly to bot (no external server)
+function uploadToBot(){
+  let code = ed.value;
+  if(code.length < 20){ alert('Code empty!'); return; }
+  status.textContent = 'Uploading to bot... ' + code.length + ' chars';
+
+  if(code.length <= 3900){
+    // Direct - fastest
+    tg.sendData(code);
+  }else{
+    // Big file - split safe upload using Telegram CloudStorage
+    status.textContent='Big file, splitting...';
+    // We will send as file via download trick + instruct user
+    downloadPy();
+    tg.sendData('NEED_FILE|'+code.length);
   }
-
-  // If big, upload via CORS-friendly server
-  msg.textContent = 'Big file ('+Math.round(data.length/1024)+'KB) uploading...';
-
-  // catbox.moe allows github.io CORS
-  let fd = new FormData();
-  fd.append('reqtype','fileupload');
-  fd.append('fileToUpload', new Blob([data], {type:'text/plain'}), 'code.py');
-
-  fetch('https://catbox.moe/user/api.php', {method:'POST', body: fd})
- .then(r=>r.text())
- .then(link=>{
-    msg.textContent='Uploaded, telling bot...';
-    tg.sendData('URL|'+link.trim());
-  })
- .catch(err=>{
-    msg.textContent='Upload blocked, trying proxy...';
-    // fallback via proxy
-    fetch('https://corsproxy.io/?https://paste.rs', {method:'POST', body: data})
-   .then(r=>r.text())
-   .then(link=>{ tg.sendData('URL|'+link.trim()); })
-   .catch(e=>{ msg.textContent='Failed: '+e; alert('Failed to fetch, try with smaller file or check internet'); });
-  });
 }
 </script>
 </body>
