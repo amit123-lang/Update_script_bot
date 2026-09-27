@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bot Script Editor</title>
-    <!-- Import Telegram's official Web App script -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body {
@@ -17,6 +16,12 @@
             flex-direction: column;
             height: 95vh;
         }
+        #status {
+            text-align: center;
+            font-family: sans-serif;
+            color: #aaa;
+            margin-bottom: 10px;
+        }
         textarea {
             flex-grow: 1;
             background-color: #2d2d2d;
@@ -27,36 +32,55 @@
             resize: none;
             border-radius: 8px;
             outline: none;
+            white-space: pre;
         }
     </style>
 </head>
 <body>
-
-    <h3 style="text-align: center; font-family: sans-serif;">🛠️ Ultimate Bot Editor</h3>
-    <textarea id="codeEditor" placeholder="Paste your updated Python script here..."></textarea>
+    <div id="status">🛠️ Ultimate Bot Editor <br><small>Loading script from Termux...</small></div>
+    
+    <!-- The code box -->
+    <textarea id="codeEditor" placeholder="Your Python script will appear here..."></textarea>
 
     <script>
         let tg = window.Telegram.WebApp;
-        tg.expand(); // Make the Mini App fill the screen
+        tg.expand();
 
-        // Set up the Telegram Main Button at the bottom of the screen
+        // Setup the green update button
         tg.MainButton.text = "UPDATE BOT SCRIPT";
-        tg.MainButton.color = "#28a745"; // Green color
+        tg.MainButton.color = "#28a745";
         tg.MainButton.show();
 
-        // When the Admin clicks the Update button
+        // 1. Check if the Python bot sent us a script link
+        const urlParams = new URLSearchParams(window.location.search);
+        const scriptUrl = urlParams.get('url');
+
+        if (scriptUrl) {
+            // 2. Fetch the script using a proxy so Android browsers don't block it
+            const proxyUrl = "https://api.allorigins.win/raw?url=" + encodeURIComponent(scriptUrl);
+            
+            fetch(proxyUrl)
+                .then(response => response.text())
+                .then(data => {
+                    // Paste the code into the box automatically!
+                    document.getElementById("codeEditor").value = data;
+                    document.getElementById("status").innerHTML = "🛠️ Ultimate Bot Editor <br><small style='color:#0f0'>✅ Script Loaded Successfully!</small>";
+                })
+                .catch(err => {
+                    document.getElementById("status").innerHTML = "🛠️ Ultimate Bot Editor <br><small style='color:red'>❌ Failed to load script.</small>";
+                });
+        }
+
+        // 3. When you tap "Update", send the new code back to Termux
         Telegram.WebApp.onEvent('mainButtonClicked', function() {
             let newCode = document.getElementById("codeEditor").value;
-            
             if(newCode.trim() === "") {
                 tg.showAlert("⚠️ Cannot upload an empty script!");
                 return;
             }
-
-            // Send the code invisibly back to the Python script in Termux
             tg.sendData(newCode);
         });
     </script>
 </body>
-  </html>
-  
+</html>
+
