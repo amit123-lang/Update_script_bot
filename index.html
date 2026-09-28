@@ -6,68 +6,77 @@
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 body{margin:0;background:#000;color:#fff;font-family:monospace;display:flex;flex-direction:column;height:100vh}
-#top{padding:10px;background:#151515;display:flex;justify-content:space-between}
-#ed{flex:1;background:#111;color:#0f0;border:0;padding:10px;font-size:12px;outline:none;white-space:pre}
-button{padding:15px;margin:6px;border:0;border-radius:10px;font-weight:800}
+#top{padding:12px;background:#111;text-align:center;border-bottom:1px solid #222}
+#ed{flex:1;background:#111;color:#0f0;border:0;padding:10px;font-size:12px;outline:none}
+button{padding:16px;margin:6px;border:0;border-radius:10px;font-weight:800;font-size:14px}
 .b1{background:#2AABEE;color:#fff}
-.b2{background:#333;color:#fff}
-#log{font-size:10px;color:#888;text-align:center;padding:3px;height:12px}
+.b2{background:#00c853;color:#fff}
+.b3{background:#333;color:#fff}
+#log{font-size:11px;color:#888;text-align:center;padding:5px}
 </style>
 </head>
 <body>
-<div id="top"><b id="title">EDITOR</b><span id="meta" style="font-size:10px;color:#888"></span></div>
-<div id="log">starting...</div>
-<textarea id="ed"></textarea>
-<button class="b1" onclick="saveAndUpdate()">💾 SAVE & UPDATE BOT (sends to /update_bot)</button>
-<button class="b2" onclick="saveFile()">📥 DOWNLOAD 1.py to Phone</button>
+<div id="top">⚡ EDITOR - Uses Your Phone Only</div>
+<div id="log">Ready - Load your bot.py file</div>
+<input type="file" id="fileInput" accept=".py,.txt" style="display:none">
+<button class="b3" onclick="document.getElementById('fileInput').click()">📂 LOAD ORIGINAL bot.py FROM PHONE</button>
+<textarea id="ed" placeholder="1. Send /editor in bot
+2. Bot will send you bot.py file
+3. Download that file
+4. Click LOAD FROM PHONE above and select that file
+5. It will load INSTANT - no internet needed"></textarea>
+<button class="b1" onclick="sendToBot()">💾 SAVE & SEND TO BOT FOR /update_bot</button>
+<button class="b2" onclick="download1py()">📥 DOWNLOAD 1.py TO PHONE</button>
 
 <script>
 let tg=Telegram.WebApp; tg.expand();
 let ed=document.getElementById('ed');
 let log=document.getElementById('log');
-let meta=document.getElementById('meta');
+let fileInput=document.getElementById('fileInput');
 
-function slog(t){ log.textContent=t; console.log(t); }
+fileInput.addEventListener('change', e=>{
+  let file=e.target.files[0];
+  if(!file) return;
+  let reader=new FileReader();
+  log.textContent='Loading '+file.name+'...';
+  reader.onload=ev=>{
+    ed.value=ev.target.result;
+    log.textContent='Loaded '+file.name+' : '+ed.value.length+' chars | '+ed.value.split('\n').length+' lines ✅';
+  };
+  reader.readAsText(file);
+});
 
-// 1. Try load from?url=
-async function loadOriginal(){
-  let url=new URLSearchParams(location.search).get('url');
-  if(!url){
-    slog('No url param - paste code or open via /editor');
-    ed.placeholder='Paste your bot.py code here...';
-    return;
+// Auto-try load from?url= if provided (for old links)
+(async()=>{
+  let u=new URLSearchParams(location.search).get('url');
+  if(u && u.startsWith('data:')){
+    try{
+      let code=atob(u.split(',')[1]);
+      ed.value=code;
+      log.textContent='Loaded via data: '+code.length+' chars';
+    }catch(e){}
+  } else if(u){
+    try{
+      let txt=await (await fetch(u)).text();
+      ed.value=txt;
+      log.textContent='Loaded: '+txt.length+' chars';
+    }catch(e){}
   }
-  slog('Loading: '+url.substring(0,40)+'...');
-  try{
-    let r=await fetch(url);
-    if(!r.ok) throw 'http '+r.status;
-    let txt=await r.text();
-    if(txt.length<100) throw 'too short';
-    ed.value=txt;
-    meta.textContent=txt.length+' chars | '+txt.split('\n').length+' lines';
-    slog('Loaded original script ✅ Now edit');
-  }catch(e){
-    slog('Load failed: '+e+' - Try opening in Chrome or paste manually');
-    ed.placeholder='Load failed. Paste code here manually...';
-  }
-}
-loadOriginal();
+})();
 
-function saveAndUpdate(){
-  let code=ed.value;
-  if(code.length<50){ tg.showAlert('Code empty!'); return; }
-  slog('Sending to bot for /update_bot...');
-  tg.sendData(code); // This goes to your bot
+function sendToBot(){
+  if(ed.value.length<50){ tg.showAlert('Code empty'); return; }
+  log.textContent='Sending to bot...';
+  tg.sendData(ed.value);
 }
 
-function saveFile(){
-  let code=ed.value;
-  let blob=new Blob([code],{type:'text/x-python'});
+function download1py(){
+  let blob=new Blob([ed.value],{type:'text/x-python'});
   let a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
   a.download='1.py';
   a.click();
-  slog('Downloaded 1.py - Check Downloads');
+  log.textContent='Downloaded 1.py to Downloads ✅';
 }
 </script>
 </body>
