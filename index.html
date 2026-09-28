@@ -46,23 +46,21 @@ fileInput.addEventListener('change', e=>{
   reader.readAsText(file);
 });
 
-// Auto-try load from?url= if provided (for old links)
-(async()=>{
+async function loadFromUrl(){
   let u=new URLSearchParams(location.search).get('url');
-  if(u && u.startsWith('data:')){
-    try{
-      let code=atob(u.split(',')[1]);
-      ed.value=code;
-      log.textContent='Loaded via data: '+code.length+' chars';
-    }catch(e){}
-  } else if(u){
-    try{
+  if(!u) return;
+  try{
+    if(u.startsWith('data:')){
+      ed.value=atob(u.split(',')[1]);
+      log.textContent='Loaded via data: '+ed.value.length+' chars';
+    }else{
       let txt=await (await fetch(u)).text();
       ed.value=txt;
       log.textContent='Loaded: '+txt.length+' chars';
-    }catch(e){}
-  }
-})();
+    }
+  }catch(e){}
+}
+loadFromUrl();
 
 function sendToBot(){
   if(ed.value.length<50){ tg.showAlert('Code empty'); return; }
@@ -71,12 +69,40 @@ function sendToBot(){
 }
 
 function download1py(){
-  let blob=new Blob([ed.value],{type:'text/x-python'});
-  let a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download='1.py';
-  a.click();
-  log.textContent='Downloaded 1.py to Downloads ✅';
+  let code=ed.value;
+  if(code.length<50){ tg.showAlert('Code empty'); return; }
+
+  try{
+    // Method that WORKS in Mini App - uses your Chrome
+    let blob=new Blob([code],{type:'text/x-python'});
+    let url=URL.createObjectURL(blob);
+
+    // Try 1: Direct download (works in Chrome)
+    let a=document.createElement('a');
+    a.href=url;
+    a.download='1.py';
+    a.style.display='none';
+    document.body.appendChild(a);
+    a.click();
+
+    // Try 2: Open in external browser where download works
+    setTimeout(()=>{
+      document.body.removeChild(a);
+      // If still in Telegram, open in external browser
+      if(window.Telegram && Telegram.WebApp){
+        Telegram.WebApp.openLink(url);
+        log.textContent='If not downloaded, check Chrome - Opening...';
+      }
+      setTimeout(()=>URL.revokeObjectURL(url), 5000);
+    }, 500);
+
+    log.textContent='Downloading 1.py... Check notification bar';
+
+  }catch(e){
+    // Fallback - send to bot, bot will send file back that you CAN download
+    log.textContent='Direct download blocked by Telegram, sending via bot...';
+    tg.sendData('DOWNLOAD_FILE|'+code);
+  }
 }
 </script>
 </body>
