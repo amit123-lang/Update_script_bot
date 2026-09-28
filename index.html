@@ -3,31 +3,63 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<title>Editor Alt3</title>
 <style>
-body{margin:0;background:#000;color:#fff;font-family:monospace;display:flex;flex-direction:column;height:100vh}
-#ed{flex:1;background:#111;color:#0f0;border:0;padding:10px;font-size:13px}
-button{padding:18px;background:#2AABEE;color:#fff;border:0;font-weight:800;font-size:16px;margin:8px;border-radius:10px}
-#top{padding:10px;background:#151515;text-align:center}
+body{margin:0;background:#0a0a0a;color:#fff;font-family:monospace;display:flex;flex-direction:column;height:100vh}
+#top{padding:12px;background:#151515;text-align:center;border-bottom:1px solid #222}
+#ed{flex:1;background:#111;color:#00ff88;border:0;padding:12px;font-size:13px;outline:none;resize:none}
+button{padding:18px;margin:8px;border:0;border-radius:12px;font-weight:800;font-size:15px}
+.b1{background:#2AABEE;color:#fff}
+.b2{background:#333;color:#fff;font-size:12px}
+#info{font-size:11px;color:#666;text-align:center;padding:4px}
 </style>
 </head>
 <body>
-<div id="top">EDITOR - Saves to Telegram Chat as 1.py</div>
-<textarea id="ed" placeholder="Paste code..."></textarea>
-<button onclick="send()">📤 SEND 1.py TO MY TELEGRAM CHAT</button>
+<div id="top">📁 EDITOR - ALT 3 (Chrome Download)</div>
+<textarea id="ed" placeholder="Loading original script..."></textarea>
+<div id="info">File will be saved as 1.py in Download folder</div>
+<button class="b1" onclick="saveChrome()">💾 SAVE AS 1.py TO PHONE STORAGE</button>
+<button class="b2" onclick="openChrome()">🌐 If save fails, click to Open in Chrome</button>
 
 <script>
-let tg=Telegram.WebApp; tg.expand();
-let ed=document.getElementById('ed');
+let ed=document.getElementById('ed'), info=document.getElementById('info');
+
+// Load original bot script via?url=
 (async()=>{
- let u=new URLSearchParams(location.search).get('url');
- if(u){ try{ ed.value=await (await fetch(u)).text(); }catch(e){} }
+  let u=new URLSearchParams(location.search).get('url');
+  if(!u){ info.textContent='Paste code manually'; return; }
+  try{
+    let code=await (await fetch(u)).text();
+    ed.value=code;
+    info.textContent=code.length+' chars loaded | Ready to edit';
+  }catch(e){ info.textContent='Load failed, paste manually'; }
 })();
-function send(){
- let code=ed.value;
- if(!code){ alert('empty'); return; }
- // Send directly to bot - no download needed
- tg.sendData(code);
+
+function saveChrome(){
+  let code=ed.value;
+  if(!code){ alert('empty'); return; }
+
+  // This WORKS in Chrome, not in Telegram
+  let blob=new Blob([code], {type:'text/x-python'});
+  let url=URL.createObjectURL(blob);
+  let a=document.createElement('a');
+  a.href=url;
+  a.download='1.py';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    info.textContent='✅ Check Download folder: 1.py saved ('+Math.round(code.length/1024)+'KB)';
+    info.style.color='#00ff88';
+  }, 500);
+}
+
+function openChrome(){
+  let currentUrl=window.location.href;
+  // Try to open in external browser
+  window.open(currentUrl, '_blank');
+  info.textContent='Opening in Chrome... If not, copy link and paste in Chrome: '+currentUrl;
 }
 </script>
 </body>
