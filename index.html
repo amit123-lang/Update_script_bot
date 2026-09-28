@@ -3,79 +3,31 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Save 1.py</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 body{margin:0;background:#000;color:#fff;font-family:monospace;display:flex;flex-direction:column;height:100vh}
 #ed{flex:1;background:#111;color:#0f0;border:0;padding:10px;font-size:13px}
-button{margin:6px;padding:16px;border:0;border-radius:10px;font-weight:800}
-.b1{background:#2AABEE;color:#fff}
-.b2{background:#fff;color:#000}
-#top{padding:10px;background:#151515}
+button{padding:18px;background:#2AABEE;color:#fff;border:0;font-weight:800;font-size:16px;margin:8px;border-radius:10px}
+#top{padding:10px;background:#151515;text-align:center}
 </style>
 </head>
 <body>
-<div id="top"><b>SAVE AS 1.py</b> <span id="sz" style="float:right;color:#888"></span></div>
-<textarea id="ed"></textarea>
-<button class="b1" onclick="save1()">💾 SAVE 1.py TO PHONE</button>
-<button class="b2" onclick="copyCode()">📋 COPY CODE (Paste in MiXplorer)</button>
-<div id="msg" style="text-align:center;font-size:11px;color:#666;padding:6px">Click save - will open download</div>
+<div id="top">EDITOR - Saves to Telegram Chat as 1.py</div>
+<textarea id="ed" placeholder="Paste code..."></textarea>
+<button onclick="send()">📤 SEND 1.py TO MY TELEGRAM CHAT</button>
 
 <script>
 let tg=Telegram.WebApp; tg.expand();
-let ed=document.getElementById('ed'), msg=document.getElementById('msg'), sz=document.getElementById('sz');
-ed.addEventListener('input',()=>sz.textContent=ed.value.length+' chars');
-
+let ed=document.getElementById('ed');
 (async()=>{
  let u=new URLSearchParams(location.search).get('url');
- if(u){ try{ ed.value=await (await fetch(u)).text(); sz.textContent=ed.value.length+' chars'; }catch(e){} }
+ if(u){ try{ ed.value=await (await fetch(u)).text(); }catch(e){} }
 })();
-
-function save1(){
+function send(){
  let code=ed.value;
  if(!code){ alert('empty'); return; }
-
- try{
-  // Method 1: Works in Telegram WebApp
-  let blob=new Blob([code], {type:'application/octet-stream'});
-  let url=URL.createObjectURL(blob);
-
-  // For Telegram, must use window.open external
-  let a=document.createElement('a');
-  a.href=url;
-  a.download='1.py';
-  a.style.display='none';
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
-
-  msg.textContent='If not downloaded, click COPY button below';
-
-  // Method 2: Try share API (best for mobile)
-  setTimeout(async()=>{
-    try{
-      let file=new File([code], '1.py', {type:'text/x-python'});
-      if(navigator.canShare && navigator.canShare({files:[file]})){
-        await navigator.share({files:[file], title:'1.py'});
-      }
-    }catch(e){}
-  }, 500);
-
- }catch(e){
-  msg.textContent='Download blocked by Telegram. Use COPY method.';
- }
-}
-
-function copyCode(){
- navigator.clipboard.writeText(ed.value).then(()=>{
-   msg.textContent='✅ Copied! Open File Manager > Create new file 1.py > Paste';
-   alert('Code copied! Now:\n1. Open File Manager\n2. Go to Download folder\n3. Create new file named 1.py\n4. Paste');
- }).catch(()=>{
-   // Fallback select all
-   ed.select();
-   document.execCommand('copy');
-   msg.textContent='Copied (manual). Paste in file manager.';
- });
+ // Send directly to bot - no download needed
+ tg.sendData(code);
 }
 </script>
 </body>
