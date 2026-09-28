@@ -16,20 +16,17 @@ button{padding:16px;margin:6px;border:0;border-radius:10px;font-weight:800;font-
 </style>
 </head>
 <body>
-<div id="top">⚡ EDITOR - Uses Your Phone Only</div>
-<div id="log">Ready - Load your bot.py file</div>
+<div id="top">⚡ EDITOR - Mini App + Website</div>
+<div id="log">Loading original script...</div>
 <input type="file" id="fileInput" accept=".py,.txt" style="display:none">
-<button class="b3" onclick="document.getElementById('fileInput').click()">📂 LOAD ORIGINAL bot.py FROM PHONE</button>
-<textarea id="ed" placeholder="1. Send /editor in bot
-2. Bot will send you bot.py file
-3. Download that file
-4. Click LOAD FROM PHONE above and select that file
-5. It will load INSTANT - no internet needed"></textarea>
+<button class="b3" onclick="document.getElementById('fileInput').click()">📂 LOAD FROM PHONE (Fallback)</button>
+<textarea id="ed" placeholder="Loading..."></textarea>
 <button class="b1" onclick="sendToBot()">💾 SAVE & SEND TO BOT FOR /update_bot</button>
-<button class="b2" onclick="download1py()">📥 DOWNLOAD 1.py TO PHONE</button>
+<button class="b2" onclick="download1py()">📥 DOWNLOAD 1.py</button>
 
 <script>
-let tg=Telegram.WebApp; tg.expand();
+let tg=null;
+try{ tg=Telegram.WebApp; tg.expand(); }catch(e){}
 let ed=document.getElementById('ed');
 let log=document.getElementById('log');
 let fileInput=document.getElementById('fileInput');
@@ -38,70 +35,78 @@ fileInput.addEventListener('change', e=>{
   let file=e.target.files[0];
   if(!file) return;
   let reader=new FileReader();
-  log.textContent='Loading '+file.name+'...';
   reader.onload=ev=>{
     ed.value=ev.target.result;
-    log.textContent='Loaded '+file.name+' : '+ed.value.length+' chars | '+ed.value.split('\n').length+' lines ✅';
+    log.textContent='Loaded '+file.name+' : '+ed.value.length+' chars ✅';
   };
   reader.readAsText(file);
 });
 
-async function loadFromUrl(){
+// SMART AUTO-LOAD - Works on BOTH Mini App + Website
+async function smartLoad(){
+  // 1. Try?url= param (Mini App)
   let u=new URLSearchParams(location.search).get('url');
-  if(!u) return;
-  try{
-    if(u.startsWith('data:')){
-      ed.value=atob(u.split(',')[1]);
-      log.textContent='Loaded via data: '+ed.value.length+' chars';
-    }else{
-      let txt=await (await fetch(u)).text();
+  if(u){
+    try{
+      log.textContent='Loading from url param...';
+      let txt=u.startsWith('data:')? atob(u.split(',')[1]) : await (await fetch(u)).text();
+      if(txt.length>50){ ed.value=txt; log.textContent='Loaded from url: '+txt.length+' chars ✅'; return; }
+    }catch(e){ console.log(e); }
+  }
+
+  // 2. Try loading bot.py from SAME WEBSITE (your github.io)
+  // This makes website https://amit123-lang.github.io/Update_script_bot/ load automatically
+  let sources=[
+    './bot.py',
+    './1.py',
+    'bot.py',
+    'https://amit123-lang.github.io/Update_script_bot/bot.py'
+  ];
+
+  for(let src of sources){
+    try{
+      log.textContent='Trying to load: '+src+'...';
+      let r=await fetch(src, {cache:'no-cache'});
+      if(!r.ok) continue;
+      let txt=await r.text();
+      if(txt.length<100 ||!txt.includes('def') &&!txt.includes('import')) continue;
       ed.value=txt;
-      log.textContent='Loaded: '+txt.length+' chars';
-    }
-  }catch(e){}
+      log.textContent='Loaded original from website: '+src+' - '+txt.length+' chars ✅';
+      return;
+    }catch(e){}
+  }
+
+  log.textContent='Auto-load failed - Click LOAD FROM PHONE';
 }
-loadFromUrl();
+
+smartLoad();
 
 function sendToBot(){
-  if(ed.value.length<50){ tg.showAlert('Code empty'); return; }
-  log.textContent='Sending to bot...';
-  tg.sendData(ed.value);
+  if(ed.value.length<50){ alert('Code empty'); return; }
+  if(tg){
+    log.textContent='Sending to bot...';
+    tg.sendData(ed.value);
+  }else{
+    // Website version - download
+    download1py();
+    log.textContent='On website: File downloaded, send it to bot as document';
+  }
 }
 
 function download1py(){
   let code=ed.value;
-  if(code.length<50){ tg.showAlert('Code empty'); return; }
-
+  if(code.length<50){ alert('Code empty'); return; }
   try{
-    // Method that WORKS in Mini App - uses your Chrome
     let blob=new Blob([code],{type:'text/x-python'});
     let url=URL.createObjectURL(blob);
-
-    // Try 1: Direct download (works in Chrome)
     let a=document.createElement('a');
-    a.href=url;
-    a.download='1.py';
-    a.style.display='none';
-    document.body.appendChild(a);
-    a.click();
-
-    // Try 2: Open in external browser where download works
-    setTimeout(()=>{
-      document.body.removeChild(a);
-      // If still in Telegram, open in external browser
-      if(window.Telegram && Telegram.WebApp){
-        Telegram.WebApp.openLink(url);
-        log.textContent='If not downloaded, check Chrome - Opening...';
-      }
-      setTimeout(()=>URL.revokeObjectURL(url), 5000);
-    }, 500);
-
-    log.textContent='Downloading 1.py... Check notification bar';
-
+    a.href=url; a.download='1.py'; a.style.display='none';
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); },1000);
+    log.textContent='Downloaded 1.py ✅ Check Downloads';
+    if(tg){ try{ tg.openLink(url); }catch(e){} }
   }catch(e){
-    // Fallback - send to bot, bot will send file back that you CAN download
-    log.textContent='Direct download blocked by Telegram, sending via bot...';
-    tg.sendData('DOWNLOAD_FILE|'+code);
+    if(tg) tg.sendData('DOWNLOAD_FILE|'+code);
   }
 }
 </script>
